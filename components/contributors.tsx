@@ -1,62 +1,62 @@
 import Image from "next/image";
-import { cacheLife, cacheTag } from "next/cache";
-import { TAGS } from "@/components/github-fresh";
+import { cacheLife } from "next/cache";
 import { githubFetch } from "@/components/github-api";
 import { format, getMessages, NUMBER_LOCALE, rich, type Locale } from "@/components/i18n";
 import { ClaudeIcon, ExternalLinkIcon } from "@/components/icons";
 import { GITHUB_URL } from "@/components/links";
-import { MOD_FORK_EXTRA_COMMITS } from "@/components/mod-api-commits";
+import snapshot from "@/data/contributors-snapshot.json";
 
 const REPO = "horizon-rust/horizon";
-
-const NOT_PEOPLE = new Set(["claude", "cursoragent", "noreply"]);
 
 const TEAM = [{ name: "Anthony S", role: "webDeveloper" as const, avatar: "/media/anthony-s.webp", url: "https://dezerx.com" }];
 
 const FEATURED = 6;
 
-type GitHubContributor = { login: string; avatar_url: string; html_url: string; contributions: number; type: string };
-type Contributor = { login: string; avatar: string; url: string; commits: number };
+// What scripts/contributors-data.mjs writes to this repository's contributors-data branch every six hours.
+type ContributorsFile = { generatedAt: string; rule: string; contributors: { login: string; avatarUrl: string; prs: number; reviews: number }[] };
+export type Contributor = { login: string; avatar: string; url: string; prs: number; reviews: number };
 type Card = { name: string; detail: string; avatar: string; url: string };
 
-export async function getContributors(): Promise<Contributor[] | null> {
+// The last list read from GitHub, for when a later read fails.
+let lastGood: Contributor[] | null = null;
+
+// Everyone who worked on a merged pull request or reviewed someone else's, here and in the mod fork before the mod
+// API merge, most first. The counting happens in scripts/contributors-data.mjs; without its file the list is the
+// snapshot in data/, never GitHub's commit counts.
+export async function getContributors(): Promise<Contributor[]> {
+  const fresh = await readContributors();
+  if (fresh) lastGood = fresh;
+  return lastGood ?? toContributors(snapshot);
+}
+
+async function readContributors(): Promise<Contributor[] | null> {
   "use cache";
-  cacheTag(TAGS.main);
-  const all: GitHubContributor[] = [];
   try {
-    for (let page = 1; page <= 5; page++) {
-      const res = await githubFetch(`/repos/${REPO}/contributors?per_page=100&page=${page}`);
-      if (!res.ok) throw new Error(`GitHub responded ${res.status} ${res.statusText}`);
-      const batch: GitHubContributor[] = await res.json();
-      all.push(...batch);
-      if (batch.length < 100) break;
-    }
+    const res = await githubFetch("/repos/horizon-rust/horizon-site/contents/contributors.json?ref=contributors-data");
+    if (!res.ok) throw new Error(`GitHub responded ${res.status} ${res.statusText}`);
+    const { content } = (await res.json()) as { content?: string };
+    const file = JSON.parse(Buffer.from(content ?? "", "base64").toString("utf8")) as ContributorsFile;
+    if (!Array.isArray(file.contributors) || !file.contributors.length) throw new Error("no contributors in the file");
+    cacheLife("hours");
+    return toContributors(file);
   } catch (error) {
-    console.error(`Couldn't load contributors for ${REPO}:`, error);
+    console.error("Couldn't read contributors.json from horizon-site's contributors-data branch:", error);
     cacheLife("minutes");
     return null;
   }
-
-  cacheLife("hours");
-  return all
-    .filter((c) => c.type === "User" && !NOT_PEOPLE.has(c.login))
-    .map((c) => ({
-      login: c.login,
-      avatar: c.avatar_url,
-      url: c.html_url,
-      commits: c.contributions - (MOD_FORK_EXTRA_COMMITS[c.login.toLowerCase()] ?? 0),
-    }))
-    .filter((c) => c.commits > 0)
-    .sort((a, b) => b.commits - a.commits);
 }
+
+const toContributors = (file: ContributorsFile): Contributor[] =>
+  file.contributors.map((c) => ({ login: c.login, avatar: c.avatarUrl, url: `https://github.com/${c.login}`, prs: c.prs, reviews: c.reviews }));
 
 export async function Contributors({ locale }: { locale: Locale }) {
   const { common, home } = getMessages(locale);
   const t = home.contributors;
-  const commitCount = (n: number) => (n === 1 ? t.oneCommit : format(t.commits, { n: n.toLocaleString(NUMBER_LOCALE[locale]) }));
+  const fmt = (n: number) => n.toLocaleString(NUMBER_LOCALE[locale]);
+  const workOf = (c: Contributor) => format(t.work, { prs: fmt(c.prs), reviews: fmt(c.reviews) });
   const committerCard = (c: Contributor): Card => ({
     name: c.login,
-    detail: commitCount(c.commits),
+    detail: workOf(c),
     avatar: c.avatar,
     url: c.url,
   });
@@ -138,7 +138,7 @@ export async function Contributors({ locale }: { locale: Locale }) {
                   href={c.url}
                   target="_blank"
                   rel="noreferrer"
-                  title={`${c.login} · ${commitCount(c.commits)}`}
+                  title={`${c.login} · ${workOf(c)}`}
                   className="block rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#a98fff]"
                 >
                   <Image
