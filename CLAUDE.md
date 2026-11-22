@@ -38,12 +38,14 @@ entries the feed holds without changing Kira with it.
 
 ## Deploy
 
-Railway project `horizon-site`, service `site`, environment `production`: every push to `main` here goes live within
-minutes (Dockerfile: `next build`, then `next start` on `$PORT`). When the files above change on the game's `main`,
-the site is redeployed from source: for now by `~/code/horizon-parity/tools/site_redeploy_watch.sh` on the Mac mini
-(every 10 minutes), later by the game repository's `site-redeploy.yml` workflow. A failed build keeps the previous
-deployment live. After a deploy, check https://playhorizon.dev (/, /hub, /mods, /docs, /releases, /benchmarks,
-/data/roadmap.json, /data/journal.json).
+Ludovic's home server **ludothinkpad** (NixOS), system service `horizon-site` on `127.0.0.1:8180`, published at
+https://playhorizon.dev by a Cloudflare Tunnel (Cloudflare caches the public pages and assets; cache rules in the
+zone). Declared in `nixos/ludothinkpad/horizon.nix` of ludovic111/LifeOS. Its `horizon-deploy` timer (every 2 minutes)
+builds every new commit on `main` here (`npm ci`, `next build`, the standalone output), and also rebuilds when the
+files above change on the game's `main`; it restarts the site, checks `/`, and rolls back to the previous build if
+the check fails. A failed build keeps the previous version live. Logs: `journalctl -u horizon-site`,
+`journalctl -u horizon-deploy`. After a deploy, check https://playhorizon.dev (/, /hub, /mods, /docs, /releases,
+/benchmarks, /data/roadmap.json, /data/journal.json).
 
 ## Text and translations
 

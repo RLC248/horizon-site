@@ -14,12 +14,13 @@ You need Node 22 or newer.
 git clone https://github.com/horizon-rust/horizon-site && cd horizon-site
 npm ci
 npm run dev                      # http://localhost:3000
-npm run build && npm start       # the production build, as Railway runs it
+npm run build && npm start       # the production build, as the host runs it
 npm run lint
 ```
 
-- **A push to `main` goes live.** Railway builds the `Dockerfile` and deploys https://playhorizon.dev within a few
-  minutes of every push to `main`. If the build or the healthcheck fails, the previous version stays online. For
+- **A push to `main` goes live.** The site runs on Ludovic's home server (ludothinkpad), published by a Cloudflare
+  Tunnel: its `horizon-deploy` timer pulls `main` within a few minutes of every push, runs `npm ci` and `next build`,
+  restarts the site and checks it; if the build or the check fails, the previous version stays online. For
   anything bigger than a typo, push a branch and open a pull request first.
 
 ## Layout
@@ -46,7 +47,7 @@ content/docs/           the player docs (*.md) and their navigation (nav.json)
 content/benchmarks/     our benchmark runs
 vendor/horizon-site/    the previous site's hub code, unchanged; it builds /data/journal.json
 public/                 images, icons and /benchmarks.json
-Dockerfile, railway.json   the Railway service
+Dockerfile              a self-contained image of the production build (the host builds without it)
 ```
 
 The `/docs/api/*` pages come from `docs/api/` in the game's repository, read from GitHub.
@@ -162,7 +163,8 @@ build made. Kira posts each entry id once, so the ids must not change: leave `ve
 
 ## Environment
 
-Railway service variables:
+The host's variables (one environment file kept in 1Password, Agents `Horizon host env site`, written to the host by
+`horizon-secrets site`; the non-secret ones are in the host's NixOS config):
 
 | Variable | What it does |
 | --- | --- |
@@ -173,12 +175,14 @@ Railway service variables:
 | `STAFF_UPSTREAM`, `STAFF_PROXY_KEY` | Kira's staff service and the key both sides hold; `/staff/api/*` is proxied to it |
 | `RELEASE_VIEWS_SALT` | Salt for the hashed release views. Without it the server keeps one in `.data/` |
 | `TELEMETRY_URL` | Optional, defaults to `https://telemetry.playhorizon.dev` |
-| `KIRA_URL` | Optional, Kira's address for `/api/market`; defaults to `https://kira-production-500e.up.railway.app` |
+| `KIRA_URL` | Optional, Kira's address for `/api/market`; defaults to `https://mcp.playhorizon.dev` (the host sets `http://127.0.0.1:8184`) |
 | `SITE_URL` | Optional, defaults to `https://playhorizon.dev`; used for canonical links, the sitemap and share cards |
 | `COSMETICS_UPSTREAM` | Optional, defaults to `https://cosmetics.playhorizon.dev`: the cosmetics service `/shop` reads (server side only). Point it at a local stand-in for development and tests only, never on production |
-| `SHOP_PREVIEW` | `1` shows `/shop` with a sample seven-day claim window (from the start of the current hour) while the service's window is closed, for previews. Never set it on production (it is ignored where `RAILWAY_ENVIRONMENT_NAME` is `production`) |
+| `SHOP_PREVIEW` | `1` shows `/shop` with a sample seven-day claim window (from the start of the current hour) while the service's window is closed, for previews. Never set it on production (it is ignored where `SITE_ENV` is `production`, as on the host) |
+| `SITE_ENV` | `production` on the host: turns off the shop's preview switches |
 
-Release view counts live in `.data/`, which is reset by every deploy unless a volume is mounted at `/app/.data`.
+Release view counts and `perf.sqlite` live in `.data/` (on the host `/var/lib/horizon/site/`, kept across deploys and
+copied nightly to the Mac mini).
 
 ## Rules the site keeps
 

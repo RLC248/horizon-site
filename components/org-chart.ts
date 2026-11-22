@@ -3,7 +3,7 @@ import { cacheLife } from "next/cache";
 // The hub's People tab: who runs Horizon, as the Discord server's roles say, top to bottom. Kira builds it from its
 // member cache and serves it as GET /staff.json (kira's src/org-chart.js: names, roles, Discord avatars, and GitHub
 // logins only where they are confirmed). A role given on Discord shows here within about ten minutes, no deploy.
-const KIRA = (process.env.KIRA_URL || "https://kira-production-500e.up.railway.app").replace(/\/+$/, "");
+const KIRA = (process.env.KIRA_URL || "https://mcp.playhorizon.dev").replace(/\/+$/, "");
 
 export type OrgPerson = { name: string; username: string; avatar: string | null; github: string | null; job: string | null };
 export type OrgTier = { key: string; post: string; people: OrgPerson[] };

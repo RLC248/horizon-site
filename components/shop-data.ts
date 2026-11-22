@@ -7,12 +7,12 @@ import { formatPrice } from "@/components/shop/pricing";
 // here. Every price comes from the catalogue; an item without prices isn't on sale and shows no price or Buy button.
 
 const UPSTREAM = (process.env.COSMETICS_UPSTREAM || "https://cosmetics.playhorizon.dev").replace(/\/+$/, "");
-const PRODUCTION = process.env.RAILWAY_ENVIRONMENT_NAME === "production";
+const PRODUCTION = process.env.SITE_ENV === "production";
 // What the browser calls (CORS allows this site only): the production service, except in a local preview.
 export const COSMETICS_API = (!PRODUCTION && process.env.COSMETICS_BROWSER_API) || "https://cosmetics.playhorizon.dev";
 
-// For previews only: shows the page with a sample window while the service's window isn't open. Ignored on Railway's
-// production environment, so a stray variable there can't open the shop early. The sample window is as long as the
+// For previews only: shows the page with a sample window while the service's window isn't open. Ignored where
+// SITE_ENV=production (the host), so a stray variable there can't open the shop early. The sample window is as long as the
 // real one: seven days from the start of the current hour. Production reads the service's own dates only.
 const PREVIEW = process.env.SHOP_PREVIEW === "1" && !PRODUCTION;
 const PREVIEW_DAYS = 7;

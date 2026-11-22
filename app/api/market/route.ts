@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 // The official server's market and economy pages, as Kira serves them (GET /smp/market.json, /smp/economy.json:
 // read from the server once a minute). Read-only; cached a minute.
-const KIRA = (process.env.KIRA_URL || "https://kira-production-500e.up.railway.app").replace(/\/+$/, "");
+const KIRA = (process.env.KIRA_URL || "https://mcp.playhorizon.dev").replace(/\/+$/, "");
 const FILES = new Set(["market", "economy"]);
 const HEADERS = { "Cache-Control": "public, max-age=60, s-maxage=60", "X-Content-Type-Options": "nosniff" };
 
