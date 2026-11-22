@@ -23,8 +23,15 @@ const SECURITY: Record<string, string> = {
   "X-Robots-Tag": "noindex, nofollow",
 };
 
-export function clientIp(request: NextRequest) {
-  return request.headers.get("x-real-ip")?.trim() || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
+// The visitor's address. Behind Cloudflare the edge in front of the app (Railway's, or none behind a tunnel) sees
+// Cloudflare's address, so Cloudflare's CF-Connecting-IP comes first; then the edge's X-Real-IP.
+export function clientIp(request: Request) {
+  return (
+    request.headers.get("cf-connecting-ip")?.trim() ||
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    ""
+  );
 }
 
 export function publicHost(request: NextRequest) {

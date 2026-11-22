@@ -1,13 +1,9 @@
 import { connection, type NextRequest } from "next/server";
 import { getReleases } from "@/components/github-releases";
 import { recordView, viewCounts } from "@/components/release-views";
+import { clientIp } from "@/components/upstream-proxy";
 
 const NO_STORE = { "Cache-Control": "no-store" };
-
-function clientIp(request: NextRequest) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || forwarded || "";
-}
 
 export async function GET() {
   await connection();
