@@ -61,7 +61,7 @@ async function hubLive(roadmap: Roadmap) {
   const missing = [...linked].filter((n) => !list.some((i) => i.n === n));
   if (missing.length && process.env.GITHUB_TOKEN) {
     const fields = missing
-      .map((n) => `n${n}: issueOrPullRequest(number: ${n}) { ... on Issue { number title state stateReason url } ... on PullRequest { number title state isDraft mergedAt url } }`)
+      .map((n) => `n${n}: issueOrPullRequest(number: ${n}) { ... on Issue { number title state stateReason url } ... on PullRequest { number title state isDraft mergedAt url author { login } mergedBy { login } labels(first: 30) { nodes { name } } } }`)
       .join(" ");
     const res = await fetch("https://api.github.com/graphql", {
       method: "POST",
@@ -70,7 +70,7 @@ async function hubLive(roadmap: Roadmap) {
       signal: AbortSignal.timeout(TIMEOUT),
     });
     if (!res.ok) throw new Error(`GraphQL: ${res.status} from GitHub`);
-    const nodes = Object.values((await res.json()).data?.repository || {}).filter(Boolean) as Record<string, string | boolean | number | null>[];
+    const nodes = Object.values((await res.json()).data?.repository || {}).filter(Boolean) as Record<string, any>[];
     list.push(
       ...nodes.map((x) =>
         slimIssue({
@@ -80,12 +80,54 @@ async function hubLive(roadmap: Roadmap) {
           draft: x.isDraft,
           state: x.state === "OPEN" ? "open" : "closed",
           state_reason: x.stateReason === "NOT_PLANNED" ? "not_planned" : null,
+          user: x.author ? { login: x.author.login } : undefined,
+          merged_by: x.mergedBy ? { login: x.mergedBy.login } : undefined,
+          labels: x.labels?.nodes,
           pull_request: "isDraft" in x ? { merged_at: x.mergedAt } : undefined,
         }),
       ),
     );
   }
   return list;
+}
+
+// Who merged a pull request never changes, so each answer is kept for the life of the process: after the first
+// build, a deploy asks about new merges only. /issues (the hub's list) lacks merged_by, so this reads the pull
+// request itself: one GraphQL call per 100 pull requests with a token, else one REST read each (through Kira's cache).
+const mergers = new Map<number, string | null>();
+
+async function mergedByFor(numbers: number[]) {
+  const todo = numbers.filter((n) => !mergers.has(n));
+  try {
+    if (process.env.GITHUB_TOKEN) {
+      for (let i = 0; i < todo.length; i += 100) {
+        const batch = todo.slice(i, i + 100);
+        const fields = batch.map((n) => `n${n}: pullRequest(number: ${n}) { mergedBy { login } }`).join(" ");
+        const res = await fetch("https://api.github.com/graphql", {
+          method: "POST",
+          headers: githubHeaders(),
+          body: JSON.stringify({ query: `query { repository(owner: "horizon-rust", name: "horizon") { ${fields} } }` }),
+          signal: AbortSignal.timeout(TIMEOUT),
+        });
+        if (!res.ok) throw new Error(`GraphQL: ${res.status} from GitHub`);
+        const repo = (await res.json()).data?.repository || {};
+        for (const n of batch) if (repo[`n${n}`]) mergers.set(n, repo[`n${n}`].mergedBy?.login || null);
+      }
+    } else {
+      for (let i = 0; i < todo.length; i += 8) {
+        await Promise.all(
+          todo.slice(i, i + 8).map(async (n) => {
+            const res = await githubFetch(`/repos/${REPO}/pulls/${n}`);
+            if (res.ok) mergers.set(n, (await res.json()).merged_by?.login || null);
+          }),
+        );
+      }
+    }
+  } catch (error) {
+    // The people are extra: without them the entries still go out, with merged_by null.
+    console.error("Couldn't read who merged:", error);
+  }
+  return mergers;
 }
 
 export async function journalText(): Promise<string | null> {
@@ -97,7 +139,10 @@ export async function journalText(): Promise<string | null> {
     const roadmap = JSON.parse(text) as Roadmap;
     const [releases, list] = await Promise.all([allReleases(), hubLive(roadmap)]);
     cacheLife(FEED_LIFE);
-    return `${JSON.stringify(journalJson(releases, list, roadmap), null, 1)}\n`;
+    const first = journalJson(releases, list, roadmap);
+    const known = await mergedByFor(first.entries.filter((e: { kind: string }) => e.kind === "merge").map((e: { number: number }) => e.number));
+    for (const pr of list) if (known.has(pr.n)) pr.mergedBy = known.get(pr.n) ?? null;
+    return `${JSON.stringify(journalJson(releases, list, roadmap, first.generated), null, 1)}\n`;
   } catch (error) {
     console.error("Couldn't build the journal:", error);
     cacheLife(FAILED_LIFE);

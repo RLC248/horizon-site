@@ -32,6 +32,7 @@ export function slimIssue(raw) {
     state: merged ? "merged" : raw.state === "open" ? "open" : raw.state_reason === "not_planned" ? "dropped" : "closed",
     draft: Boolean(raw.draft),
     user: raw.user?.login || "",
+    mergedBy: raw.merged_by?.login || null,
     labels: (raw.labels || []).map((l) => (typeof l === "string" ? l : l.name)).filter(Boolean),
     assigned: (raw.assignees || []).length > 0,
     fixes: pr ? fixesIn(raw.body) : [],
@@ -354,6 +355,9 @@ export function journalJson(releases, list, roadmap, generated = new Date().toIS
       title: pr.title,
       url: pr.url,
       number: pr.n,
+      author: pr.user || "",
+      merged_by: pr.mergedBy || null,
+      labels: pr.labels,
       ...(item ? { item, item_title: items.get(item)?.title } : {}),
     }));
   const released = ours.map((r) => ({
