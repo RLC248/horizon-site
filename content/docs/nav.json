@@ -6,5 +6,5 @@
   { "group": "Make a mod", "pages": ["make-a-mod", "mod-manifest", "mod-code", "content-mods", "test-a-mod", "publish-a-mod"] },
   { "group": "Build on Horizon", "pages": ["apis", "api", "api/stability"] },
   { "group": "API reference", "pages": ["api/mod-index", "api/server", "api/server-reference", "api/agent-control", "api/launcher", "api/data-formats", "api/shaders"] },
-  { "group": "Project", "pages": ["contributing", "faq"] }
+  { "group": "Project", "pages": ["contributing", "translations", "faq"] }
 ]
