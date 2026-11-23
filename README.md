@@ -133,8 +133,8 @@ kept every duration (`SpanSummary.timing`) show the lows as unavailable: the vie
   co-authored (the merge commit's and the branch's commits' authors and `Co-authored-by` trailers; commits with two
   parents earn nothing, and a commit counts only in the first merged pull request that contains it) and once for each pull request of someone else they reviewed, in horizon-rust/horizon and in
   the mod fork (arismoko/horizon) before the mod API merge at 2026-11-16T01:32:48Z. Bots and the agent accounts the
-  script names are left out. The site reads the file through the contents API, keeps the last good list when a read
-  fails, and starts from `data/contributors-snapshot.json` (written once by the same script) before the first read.
+  script names are left out. The site reads the public raw file, with the contents API as a fallback. If both reads
+  fail, it keeps the last good list, or uses `data/contributors-snapshot.json` on a cold start.
 - **Fresh within a minute**: every GitHub loader carries a cache tag (`components/github-fresh.ts`: the game's main,
   its issues and pull requests, its releases, horizon-mods' main). Kira gets GitHub's organization webhook and calls
   `POST /api/revalidate` (`Authorization: Bearer $REVALIDATE_SECRET`, body `{"tags": [...]}`) for what changed; the

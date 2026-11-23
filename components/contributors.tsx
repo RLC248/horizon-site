@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { cacheLife } from "next/cache";
-import { githubFetch } from "@/components/github-api";
+import { readContributorsFile, type ContributorsFile } from "@/components/contributors-data";
 import { format, getMessages, NUMBER_LOCALE, rich, type Locale } from "@/components/i18n";
 import { ClaudeIcon, ExternalLinkIcon } from "@/components/icons";
 import { GITHUB_URL } from "@/components/links";
@@ -12,8 +12,6 @@ const TEAM = [{ name: "Anthony S", role: "webDeveloper" as const, avatar: "/medi
 
 const FEATURED = 6;
 
-// What scripts/contributors-data.mjs writes to this repository's contributors-data branch every six hours.
-type ContributorsFile = { generatedAt: string; rule: string; contributors: { login: string; avatarUrl: string; prs: number; reviews: number }[] };
 export type Contributor = { login: string; avatar: string; url: string; prs: number; reviews: number };
 type Card = { name: string; detail: string; avatar: string; url: string };
 
@@ -32,11 +30,7 @@ export async function getContributors(): Promise<Contributor[]> {
 async function readContributors(): Promise<Contributor[] | null> {
   "use cache";
   try {
-    const res = await githubFetch("/repos/horizon-rust/horizon-site/contents/contributors.json?ref=contributors-data");
-    if (!res.ok) throw new Error(`GitHub responded ${res.status} ${res.statusText}`);
-    const { content } = (await res.json()) as { content?: string };
-    const file = JSON.parse(Buffer.from(content ?? "", "base64").toString("utf8")) as ContributorsFile;
-    if (!Array.isArray(file.contributors) || !file.contributors.length) throw new Error("no contributors in the file");
+    const file = await readContributorsFile();
     cacheLife("hours");
     return toContributors(file);
   } catch (error) {
